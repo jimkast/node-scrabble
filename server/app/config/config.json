@@ -1,0 +1,21 @@
+{
+    "app": {
+        "title": "Cars Fti",
+        "description": "Rental Application",
+        "keywords": "Cars, FTI, Car Rental"
+    },
+    "port": 3000,
+    "db": "mongodb://localhost/scrabblejs-dev",
+    "sessionSecret": "scrabblejs",
+    "sessionCollection": "sessions",
+    "publicDirectory": "../public/",
+    "templateEngine": "swig",
+    "localization": {
+        "directory": "./app/common/locales/",
+        "locales": ["de", "en", "fr"],
+        "defaultLocale": "de",
+        "cookieName": "locale",
+        "param": "lang",
+        "extension": ".json"
+    }
+}
