@@ -27,6 +27,8 @@ module.exports = function(db) {
     // Initialize express app
     var app = express();
 
+    app.set('jwtTokenSecret', Math.random().toString(36).substring(15));
+
     // Passing the request url to environment locals
     app.use(function(req, res, next) {
         var url = req.protocol + '://' + req.headers.host +
