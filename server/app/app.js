@@ -52,6 +52,9 @@ var workers = process.env.WORKERS || Math.min(maxWorkers, require('os').cpus().l
     // Init the express application
     var app = require('./express')(db);
 
+    app.set('jwtTokenSecret', 'YOUR_SECRET_STRING');
+    
+
     // Bootstrap passport config
     //require('./config/passport')();
 
@@ -69,5 +72,9 @@ var workers = process.env.WORKERS || Math.min(maxWorkers, require('os').cpus().l
      ;*/
 
 //}
+
+
+
+
 
 
