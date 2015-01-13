@@ -1,7 +1,5 @@
 'use strict';
 
-
-
 module.exports = function(app) {
 
     var Auth = require('../modules/auth');
@@ -27,6 +25,4 @@ module.exports = function(app) {
     return {
         authenticate: authenticate
     };
-
-
 };

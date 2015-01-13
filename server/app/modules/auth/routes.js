@@ -2,7 +2,7 @@
 
 module.exports = function(app) {
 
-    var authControllers = require('../controllers/auth');
+    var authControllers = require('./controllers');
     var middlewares = require('./middlewares')(app);
 
     app.route('/api/auth/register').post(authControllers.register);
