@@ -53,7 +53,53 @@ function generateToken(user, secret) {
 };
 
 
+function login(credentials, secret, callback) {
+
+    User.findOne({
+        username: credentials.username
+    }, function(err, user) {
+
+        if (err) {
+            callback({
+                error: 'NON_EXISTENT_USER'
+            });
+            return;
+        }
+
+        // test a matching password
+        user.comparePassword(credentials.password, function(passwordError, isMatch) {
+
+            if (passwordError) {
+                callback({
+                    error: 'ERROR_COMPARING_PASSWORDS'
+                });
+                return;
+            }
+
+            if (isMatch) {
+
+                var token = generateToken(user, secret);
+                callback(null, {
+                    expiresAt: 'aaaa',
+                    user: user.toJSON(),
+                    token: token
+                })
+
+            } else {
+                callback({
+                    error: 'WRONG_PASSWORD'
+                });
+            }
+
+        });
+
+    });
+
+};
+
+
 module.exports = {
+    login: login,
     parseToken: parseToken,
-    generateToken: generateToken
+    generateToken: generateToken,
 };

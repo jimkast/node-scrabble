@@ -32,7 +32,7 @@ module.exports = {
 
         var credentials = req.body;
 
-        Auth.login(credentials, function(err, result) {
+        Auth.login(credentials, req.app.get('jwtTokenSecret'), function(err, result) {
 
             if (err) {
                 res.status(400).json(err);

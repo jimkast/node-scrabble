@@ -32,45 +32,13 @@ module.exports = {
 
         var credentials = req.body;
 
-        User.findOne({
-            username: credentials.username
-        }, function(err, user) {
+        Auth.login(credentials, req.app.get('jwtTokenSecret'), function(err, result) {
 
             if (err) {
-                res.status(401);
-                res.json('user does not exist!!!');
-                return;
+                res.status(400).json(err);
+            } else {
+                res.json(result);
             }
-
-            // test a matching password
-            user.comparePassword(credentials.password, function(passwordError, isMatch) {
-
-                if (passwordError) {
-                    res.status(401);
-                    res.json({
-                        error: 'an error occured comparing passwords'
-                    });
-                    return;
-                }
-
-                if (isMatch) {
-
-                    var token = Auth.generateToken(user, req.app.get('jwtTokenSecret'));
-
-                    res.json({
-                        expiresAt: 'aaaa',
-                        user: user.toJSON(),
-                        token: token
-                    });
-
-                } else {
-                    res.json({
-                        error: 'wrong password'
-                    });
-                }
-
-            });
-
         });
 
     }
