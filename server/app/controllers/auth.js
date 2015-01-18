@@ -1,25 +1,10 @@
 'use strict';
 
 var mongoose = require('mongoose'),
-    User = mongoose.model('User'),
     Auth = require('../modules/auth');
 
 
-
 module.exports = {
-
-    register: function(req, res) {
-
-        var user = new User(req.body);
-
-        user.save(function(err) {
-            if (err) {
-                return res.status(400).send(err);
-            } else {
-                res.json(user);
-            }
-        });
-    },
 
     refreshToken: function(req, res) {
 
@@ -41,7 +26,24 @@ module.exports = {
             }
         });
 
-    }
+    },
 
+    authenticate: function(req, res, next) {
+
+        var token = (req.body && req.body.access_token) || (req.query && req.query.access_token) || req.headers['x-access-token'];
+
+        Auth.parseToken(token, req.app.get('jwtTokenSecret'), function(err, user) {
+            if (err) {
+                res.status(401);
+                res.json({
+                    message: 'UNAUTHORIZED'
+                });
+            } else {
+                req.user = user;
+                return next();
+            }
+        });
+
+    }
 
 };

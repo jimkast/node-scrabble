@@ -28,9 +28,10 @@ exports.gameState = {
 
 
 exports.gameStates = {
-	'GAME_WAITING_FOR_PLAYERS': 1,
-	'GAME_STARTED': 2,
-	'GAME_FINISHED': 3
+    'GAME_WAITING_FOR_PLAYERS': 1,
+    'GAME_STARTED': 2,
+    'GAME_FINISHED': 3,
+    'GAME_DELETED': 4
 };
 
 

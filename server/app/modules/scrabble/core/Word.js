@@ -1,6 +1,6 @@
 'use strict';
 
-var squareScopes = require('../data/enumerators').squareScopes;
+var squareScopes = require('./enumerators').squareScopes;
 
 function Word() {};
 

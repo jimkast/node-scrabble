@@ -1,6 +1,6 @@
 'use strict';
 
-var utils = require('../common/utils');
+var _ = require('lodash');
 
 function Tile(letter, points, alias) {
     this.letter = letter;
@@ -22,7 +22,9 @@ Tile.remove = function(tilesArray, tilesToRemove) {
     }
 
     tilesToRemove.forEach(function(tile) {
-        var idx = utils.indexOfProperty(tilesArray, 'letter', tile.letter);
+        var idx = _.findIndex(tilesArray, {
+        	letter: tile.letter
+        });
         if (idx > -1) {
             tilesArray.splice(idx, 1);
         }
@@ -32,7 +34,7 @@ Tile.remove = function(tilesArray, tilesToRemove) {
 };
 
 Tile.compare = function(tile1, tile2) {
-    return tile1.letter === tile2.letter
+    return tile1.letter === tile2.letter;
 };
 
 module.exports = Tile;

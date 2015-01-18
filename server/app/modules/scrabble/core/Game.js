@@ -3,7 +3,7 @@
 
 var _ = require('lodash'),
     util = require('util'),
-    utils = require('../common/utils'),
+    // utils = require('../common/utils'),
 
     Bucket = require('./Bucket'),
     Board = require('./Board'),
@@ -12,7 +12,7 @@ var _ = require('lodash'),
     Multipoint = require('./Multipoint'),
     Player = require('./Player'),
 
-    enums = require('../data/enumerators'),
+    enums = require('./enumerators'),
     gameStates = enums.gameStates;
 
 
@@ -20,7 +20,7 @@ var _ = require('lodash'),
 function Game() {};
 
 
-Game.prototype.newGame = function(size, langPack, boardType, rackSize) {
+Game.prototype.setup = function(size, langPack, rackSize, boardType) {
 
     if (typeof size === 'object') {
         size = size.size;
@@ -39,14 +39,7 @@ Game.prototype.newGame = function(size, langPack, boardType, rackSize) {
         rackSize: rackSize || 7,
         players: [],
         history: [],
-        state: gameStates.GAME_WAITING_FOR_PLAYERS,
-        playingState: {
-            playUsers: [],
-            playingUser: 0,
-            bucket: {},
-            timer: 0,
-            foldCounter: 0
-        }
+        state: gameStates.GAME_WAITING_FOR_PLAYERS
     };
 
 
@@ -57,32 +50,36 @@ Game.prototype.newGame = function(size, langPack, boardType, rackSize) {
 
 
 
-Game.prototype.parseHistory = function() {
+Game.prototype.buildBoardAndBucket = function() {
 
     var game = this;
     game.board = new Board(game.boardType);
     game.bucket = new Bucket(game.langPack);
-
     game.board.build();
 
     game.history.forEach(function(historyObject) {
-        game.executeAction(historyObject);
+        processHistoryObject.call(game, historyObject);
     });
-
-    if (game.state === enums.gameStates.GAME_STARTED) {
-        game.playingState.timer = game.remainingTime();
-    };
 
     return game;
 };
 
 
 
+Game.prototype.registerCreator = function(player) {
+    this.createdBy = player;
+    return this;
+};
+
 
 Game.prototype.registerPlayerForGame = function(player) {
     var game = this;
 
     if (game.players.length >= game.size) {
+        return false;
+    }
+
+    if (Player.find(game.players, player)) {
         return false;
     }
 
@@ -103,9 +100,8 @@ Game.prototype.unregisterPlayerFromGame = function(player) {
         return false;
     }
 
-    Player.remove(game.players, player);
+    return Player.remove(game.players, player);
 
-    return game;
 };
 
 
@@ -116,33 +112,66 @@ Game.prototype.unregisterPlayerFromGame = function(player) {
 Game.prototype.start = function() {
     var game = this;
 
-    game.playingState.playUsers = [];
+    game.state = enums.gameStates.GAME_STARTED;
 
-    game.playingState.playUsers = _.shuffle(game.players).map(function(player) {
+
+    var playUsers = _.shuffle(game.players).map(function(player) {
 
         var playUser = {
-            _id: player._id,
+            id: player.id,
             tiles: [],
             points: 0,
             foldCounter: 0
         };
-        game.givePlayerTiles(playUser, 7);
         return playUser;
     });
 
-    game.state = enums.gameStates.GAME_STARTED;
+    game.playingState = {
+        playUsers: playUsers,
+        playingUser: 0,
+        timer: 0,
+        foldCounter: 0
+    };
 
-    game.history.push({
-        type: enums.moveTypes.GAME_STARTED,
-        time: new Date()
+    var totalTiles = [];
+
+    playUsers.forEach(function(player) {
+        var newTiles = game.givePlayerTiles(player, game.rackSize);
+        totalTiles = tiles.concat(newTiles);
     });
+
+
+    var historyObject = {
+        type: enums.moveTypes.GAME_STARTED,
+        time: new Date(),
+        fromBucket: totalTiles
+    };
+
+    game.history.push(historyObject);
 
     return game;
 };
 
 
+Game.prototype.isOpen = function() {
+    return this.state === enums.gameStates.GAME_WAITING_FOR_PLAYERS;
+};
+
+Game.prototype.hasStarted = function() {
+    return this.state === enums.gameStates.GAME_STARTED;
+};
+
+Game.prototype.hasFinished = function() {
+    return this.state === enums.gameStates.GAME_FINISHED;
+};
+
+
+
+
 Game.prototype.finish = function() {
     var game = this;
+
+    game.state = enums.gameStates.GAME_FINISHED;
 
     game.winnerUser = Player.getWinner(game.playingState.playUsers);
 
@@ -150,8 +179,6 @@ Game.prototype.finish = function() {
         type: enums.moveTypes.GAME_FINISHED,
         time: new Date()
     });
-
-    game.state = enums.gameStates.GAME_FINISHED;
 
     return game;
 };
@@ -169,8 +196,6 @@ Game.prototype.giveTurn = function() {
 
     return game.playingState.playUsers[game.playingState.playingUser];
 };
-
-
 
 
 
@@ -203,25 +228,45 @@ Game.prototype.remainingTime = function() {
 };
 
 
-Game.prototype.foldMove = function(player, tiles) {
+Game.prototype.foldMove = function(playerData, tiles, callback) {
+
     var game = this;
 
     if (!(tiles instanceof Array)) {
         tiles = [];
     }
 
+
+    var validation = game.validatePlayer(playerData, tiles);
+
+    if (validation !== true) {
+        callback(validation);
+        return false;
+    }
+
+
+    var player = game.getPlayingUser();
+
+    player.foldCounter++;
+    game.removePlayerTiles(player, tiles).forEach(function(tile) {
+        game.bucket.tiles.push(tile);
+    });
+
+    var newTiles = game.givePlayerTiles(player, tiles.length);
+
     var historyObject = {
         type: enums.moveTypes.MOVE_FOLD,
         time: new Date(),
-        data: tiles
+        toBucket: tiles,
+        fromBucket: newTiles
     };
 
-    game.executeAction(historyObject);
+    callback(null, historyObject);
 };
 
 Game.prototype.givePlayerTiles = function(player, num) {
     var game = this;
-    var newTiles = utils.removeRandom(game.bucket.tiles, num);
+    var newTiles = game.bucket.getTiles(num);
 
     newTiles.forEach(function(tile) {
         player.tiles.push(tile);
@@ -256,47 +301,28 @@ Game.prototype.getPlayingUser = function() {
 };
 
 
-Game.prototype.executeAction = function(actionData) {
+function processHistoryObject(actionData) {
 
     var game = this;
-    var player = game.getPlayingUser();
 
-    if (actionData.type === enums.moveTypes.MOVE_WORD) {
+    if (actionData.fromBucket) {
+        Tile.remove(game.bucket.tiles, actionData.fromBucket);
+    }
 
-        player.points += actionData.result.points;
-        game.removePlayerTiles(player, Tile.extract(actionData.data));
+    if (actionData.toBucket) {
+        Tile.remove(game.bucket.tiles, actionData.toBucket);
+    }
 
-
-        if (actionData.newTiles) {
-            game.board.placeMove(actionData.data);
-            Tile.remove(game.bucket.tile, actionData.newTiles);
-            player.push(actionData.newTiles);
-        } else {
-            actionData.newTiles = game.givePlayerTiles(player, actionData.data.length);
-        }
-
-        game.board.lockMove(actionData.data);
+    if (actionData.toBoard) {
+        game.board.placeMove(actionData.toBoard);
+        game.board.lockMove(actionData.toBoard);
 
         if (game.board.isEmpty) {
             game.board.isEmpty = false;
         }
-
-        game.giveTurn();
-
-    } else if (actionData.type === enums.moveTypes.MOVE_FOLD) {
-
-        player.foldCounter++;
-        game.removePlayerTiles(player, actionData.data).forEach(function(tile) {
-            game.bucket.push(tile);
-        });
-
-        if (actionData.newTiles) {
-            Tile.remove(game.bucket.tile, actionData.newTiles);
-            player.push(actionData.newTiles);
-        } else {
-            actionData.newTiles = game.givePlayerTiles(player, actionData.data.length);
-        }
     }
+
+    return game;
 };
 
 
@@ -304,13 +330,34 @@ Game.prototype.checkMoveValidity = function(move, callback) {
 
     var game = this;
 
-    // callback = typeof callback == 'function' ? callback : emptyFunction;
+
+    Multipoint.sort(move);
+
+    if (!game.board.validCoords(move)) {
+        callback({
+            message: 'error: invalidCoords (outside board)'
+        });
+        return false;
+    }
+
+    if (!Multipoint.isAligned(move)) {
+        callback({
+            message: 'move is not aligned'
+        });
+        return false;
+    }
+
+
+    game.board.placeMove(move);
+
+
 
     var segment = game.board.lineTraverseFilled(_.first(move), _.last(move));
 
     // console.log(segment, move, 'segment')
 
     if (segment.length < move.length) {
+        game.board.unplaceMove(moveData);
         callback({
             message: 'hasGaps!!!'
         });
@@ -319,6 +366,7 @@ Game.prototype.checkMoveValidity = function(move, callback) {
 
     if (!game.board.isEmpty) {
         if (!game.board.hasFilledNeighbours(move)) {
+            game.board.unplaceMove(moveData);
             callback({
                 message: 'does not hasFilledNeighbours'
             });
@@ -326,6 +374,7 @@ Game.prototype.checkMoveValidity = function(move, callback) {
         }
     } else {
         if (!game.board.passesFromCenter(move)) {
+            game.board.unplaceMove(moveData);
             callback({
                 message: 'error: passesFromCenter'
             });
@@ -369,6 +418,38 @@ Game.prototype.calculateMovePoints = function(move) {
 };
 
 
+Game.prototype.validatePlayer = function(playerData, moveTiles) {
+
+    var game = this;
+
+    if (moveTiles.length > game.rackSize) {
+        return {
+            message: 'INVALID MOVE TILES'
+        };
+    }
+
+
+    var player = game.getPlayingUser();
+
+    if (!Player.compare(player, playerData)) {
+        return {
+            message: playerData.id + ' wrong player... now playing: ' + player.id
+        };
+    }
+
+    if (!Player.playerHasValidTiles(player, moveTiles)) {
+
+        return {
+            moveTiles: moveTiles,
+            playerTiles: player.tiles,
+            message: 'tiles do not belong to player'
+        };
+    }
+
+    return true;
+
+};
+
 
 Game.prototype.receiveMove = function(playerData, moveData, callback) {
     var game = this;
@@ -378,48 +459,21 @@ Game.prototype.receiveMove = function(playerData, moveData, callback) {
     var moveTiles = Tile.extract(moveData);
 
     var player = game.getPlayingUser();
+    var validation;
 
+    // VALIDATION
 
+    validation = game.validatePlayer(playerData, moveTiles)
 
-    // VALIDATION 
-    if (!Player.compare(player, playerData)) {
-        callback({
-            message: playerData._id + 'wrong player... now playing: ' + player._id
-        });
+    if (validation !== true) {
+        callback(validation);
         return false;
     }
 
-    if (!Player.playerHasValidTiles(player, moveTiles)) {
-
-        callback({
-            message: moveTiles + player.tiles + 'tiles do not belong to player'
-        });
-        return false;
-    }
-
-    Multipoint.sort(moveData);
-
-    if (!game.board.validCoords(moveData)) {
-        callback({
-            message: 'error: invalidCoords (outside board)'
-        });
-        return false;
-    }
-
-    if (!Multipoint.isAligned(moveData)) {
-        callback({
-            message: 'move is not aligned'
-        });
-        return false;
-    }
-
-
-    game.board.placeMove(moveData);
 
     game.checkMoveValidity(moveData, function(moveErr, moveValidationResult) {
 
         if (moveErr) {
-            game.board.unplaceMove(moveData);
             callback(moveErr, moveValidationResult);
             return false;
         }
@@ -433,24 +487,34 @@ Game.prototype.receiveMove = function(playerData, moveData, callback) {
                 callback(wordsErr);
             }
 
+            var result = game.calculateMovePoints(moveData)
+
+            player.points += result.points;
+            game.removePlayerTiles(player, moveTiles);
+            var newTiles = game.givePlayerTiles(player, moveData.length);
+
+            game.board.lockMove(moveData);
+
+            if (game.board.isEmpty) {
+                game.board.isEmpty = false;
+            }
+
+            game.giveTurn();
+
             var historyObject = {
                 time: new Date(),
                 type: enums.moveTypes.MOVE_WORD,
-                data: moveData,
-                // newTiles: newTiles,
+                toBoard: moveData,
+                fromBucket: newTiles,
                 player: playerData,
-                result: game.calculateMovePoints(moveData)
+                result: result
             };
 
             game.history.push(historyObject);
 
-            game.executeAction(historyObject);
-
             callback(null, historyObject);
 
-            return historyObject;
         });
-
 
     });
 

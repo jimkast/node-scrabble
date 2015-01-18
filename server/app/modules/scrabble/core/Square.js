@@ -1,7 +1,7 @@
 'use strict';
 
 var _ = require('lodash'),
-    enums = require('../data/enumerators'),
+    enums = require('./enumerators'),
     squareTypes = enums.squareTypes,
     squareScopes = enums.squareScopes;
 

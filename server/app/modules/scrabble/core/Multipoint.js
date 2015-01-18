@@ -1,6 +1,6 @@
 'use strict';
 
-var directions = require('../data/enumerators').directions;
+var directions = require('./enumerators').directions;
 
 
 function Multipoint(pointsArray) {};

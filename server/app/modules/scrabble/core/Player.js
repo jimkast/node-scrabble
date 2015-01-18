@@ -6,7 +6,7 @@ var Tile = require('./Tile');
 function Player() {};
 
 Player.compare = function(player1, player2) {
-    return player1['_id'] === player2['_id'];
+    return player1.id === player2.id;
 };
 
 Player.playerHasValidTiles = function(player, tiles) {
@@ -43,17 +43,21 @@ Player.sortByPoints = function(players) {
 
 Player.find = function(array, player) {
     return _.find(array, {
-        _id: player._id
+        id: player.id
     })
 };
 
 
 Player.remove = function(array, player) {
-    array.splice(_.find(array, {
-        _id: player._id
-    }), 1);
+    var index = _.findIndex(array, {
+        id: player.id
+    });
 
-    return array;
+    if (index >= 0) {
+        array.splice(index, 1);
+        return true;
+    }
+    return false;
 };
 
 module.exports = Player;

@@ -27,7 +27,8 @@ module.exports = function(db) {
     // Initialize express app
     var app = express();
 
-    app.set('jwtTokenSecret', Math.random().toString(36).substring(15));
+    // app.set('jwtTokenSecret', Math.random().toString(36).substring(15));
+    app.set('jwtTokenSecret', 'test');
 
     // Passing the request url to environment locals
     app.use(function(req, res, next) {
@@ -67,6 +68,15 @@ module.exports = function(db) {
     // Request body parsing middleware should be above methodOverride
     app.use(bodyParser.urlencoded());
     app.use(bodyParser.json());
+
+    app.use(function(error, req, res, next) {
+        //Catch json error
+        res.status(400).json({
+            message: 'INVALID_JSON'
+        });
+    });
+
+
     app.use(methodOverride());
 
     // Enable jsonp
@@ -132,7 +142,7 @@ module.exports = function(db) {
 
     // Assume 404 since no middleware responded
     app.use(function(req, res) {
-        res.status(404).render('404', {
+        res.status(404).json({
             url: req.originalUrl,
             error: 'Not Found'
         });
